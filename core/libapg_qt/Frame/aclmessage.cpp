@@ -33,6 +33,13 @@ void ACLMessage::setTimeStamp(const VectorClock& clock)
     addContent(QLatin1String("timestamp"), QJsonDocument(clock.convertToJson()).toJson(QJsonDocument::Compact));
 }
 
+void ACLMessage::setEstampille(int estampille)
+{
+    QJsonObject json;
+    json[QLatin1String("estampille")] = estampille;
+
+    addContent(QLatin1String("estampille"), QJsonDocument(json).toJson(QJsonDocument::Compact));
+}
 void ACLMessage::setSender(const QString& siteID)
 {
     addContent(QLatin1String("sender"), siteID);
@@ -61,6 +68,16 @@ VectorClock* ACLMessage::getTimeStamp() const
 
     return nullptr;
 }
+int ACLMessage::getEstampille() const{
+    QHash<QString, QString> contents = getContents();
+
+    if (contents.contains(QLatin1String("estampille")))
+    {
+        QJsonObject json =  QJsonDocument::fromJson(contents[QLatin1String("estampille")].toUtf8()).object();
+        return json[QLatin1String("estampille")].toInt();
+    }
+    return -1;
+};
 
 QJsonObject ACLMessage::getContent() const
 {

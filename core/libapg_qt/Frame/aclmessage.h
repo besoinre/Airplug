@@ -42,6 +42,7 @@ public:
         REFUSE,
         CONFIRM,
         UNKNOWN,
+        RELEASE,
 
         // custom Distributed perfomative
         REQUEST_SNAPSHOT,
@@ -61,6 +62,7 @@ public:
     void setPerformative(Performative performative);
     void setContent(const QJsonObject& content);
     void setTimeStamp(const VectorClock& clock);
+    void setEstampille(const int estampille);
 
     // siteID of sender's NET
     void setSender(const QString& siteID);
@@ -68,6 +70,7 @@ public:
 
     Performative getPerformative() const;
     VectorClock* getTimeStamp()    const;
+    int getEstampille() const;
     QJsonObject  getContent()      const;
     QString      getSender()       const;
     int          getNbSequence()   const;

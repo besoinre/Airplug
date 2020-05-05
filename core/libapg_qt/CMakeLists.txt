@@ -19,6 +19,7 @@ set(libapg_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/Frame/header.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/Clock/vector_clock.cpp
 
                 ${CMAKE_CURRENT_SOURCE_DIR}/Snapshot/laiyang_snapshot.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/Mutex/mutex.cpp
     )
 
 add_library(apg STATIC ${libapg_SRCS})
