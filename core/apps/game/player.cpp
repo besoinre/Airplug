@@ -108,6 +108,7 @@ void Player::setSpeed(int x_speed, int y_speed)
 void Player::setState(State _state)
 {
     d->state = _state;
+    this->setPos(d->state.x, d->state.y);
 }
 
 void Player::incrementFrame(void)

@@ -46,16 +46,19 @@ public:
     std::vector<std::shared_ptr<Player>> connected_player;
 
     QTimer frame_timer;
+    int frame = 0;
 
     void moveAndUpdatePlayer(Player &player);
     void fixCollisions(Player &player);
 
+    bool got_collision_ack = false;
     BasController bas_controller;
 };
 
 World::World(QCoreApplication &app) : d(std::make_unique<Private>(app))
 {
     connect(&d->bas_controller, SIGNAL(updatePlayer(int, QString)), this, SLOT(playerUpdate(int, QString)));
+    connect(&d->bas_controller, SIGNAL(updateMainPlayer(QString)), this, SLOT(mainPlayerUpdate(QString)));
     //initializing main_player
     d->main_player.setRect(0,0,PLAYER_SIZE,PLAYER_SIZE);
 
@@ -85,25 +88,11 @@ World::World(QCoreApplication &app) : d(std::make_unique<Private>(app))
     std::uniform_int_distribution<> color_dis(0, color.size()-1);
 
     d->bas_controller.establishConnections(d->main_player.getState().toJsonString());
+    connect(&d->bas_controller, SIGNAL(finishInitialization()), this, SLOT(finishInitialization()));
+}
 
-    // int n_connected_players = 5;
-    //
-    // for(int i=0; i<n_connected_players; i++)
-    // {
-    //     d->connected_player.push_back(std::make_shared<Player>());
-    //     d->connected_player[i]->setRect(0,0,PLAYER_SIZE,PLAYER_SIZE);
-    //     d->connected_player[i]->setBrush(QBrush(color[color_dis(twister)]));
-    //     d->scene.addItem(d->connected_player[i].get());
-    //
-    //     //to be changed
-    //     QList<QGraphicsItem*> colliding_items;
-    //     do
-    //     {
-    //         d->connected_player[i]->setPos(x_dis(twister), y_dis(twister));
-    //         colliding_items = d->connected_player[i]->collidingItems();
-    //     } while(colliding_items.size() != 0);
-    // }
-
+void World::finishInitialization(void)
+{
     connect(&d->frame_timer, SIGNAL(timeout()), this, SLOT(frameTimeout()));
     d->frame_timer.start(FRAME_PERIOD_MS);
 
@@ -120,33 +109,41 @@ World::~World()
 
 void World::frameTimeout(void)
 {
-    d->main_player.incrementFrame();
-
-    d->bas_controller.sendPlayerUpdate(d->main_player.getState().toJsonString());
-
-    bool all_updated = false;
-    while(!all_updated)
+    for(auto it = d->connected_player.begin(); it != d->connected_player.end(); ++it)
     {
-        all_updated = true;
-        for(auto it = d->connected_player.begin(); it != d->connected_player.end(); ++it)
-            if((*it)->getFrame() != d->main_player.getFrame())
-            {
-                all_updated = false;
-                break;
-            }
+        if((*it)->getFrame() < d->main_player.getFrame())
+        {
+            QTimer::singleShot(1, this, SLOT(frameTimeout()));
+            return;
+        }
     }
 
-    d->moveAndUpdatePlayer(d->main_player);
-    for(auto it = d->connected_player.begin(); it != d->connected_player.end(); ++it)
-        d->moveAndUpdatePlayer(**it);
+    {
+        //mutex
 
-    d->fixCollisions(d->main_player);
-    for(auto it = d->connected_player.begin(); it != d->connected_player.end(); ++it)
-        d->fixCollisions(**it);
+        //critical session
+        {
+            d->main_player.incrementFrame();
+            d->frame++;
+            d->moveAndUpdatePlayer(d->main_player);
+            d->fixCollisions(d->main_player);
+        }
+        d->bas_controller.sendPlayerUpdate(d->main_player.getState().toJsonString());
+    }
+}
+
+void World::mainPlayerUpdate(QString mp_state)
+{
+    QJsonObject obj = QJsonDocument::fromJson(mp_state.toUtf8()).object();
+    State new_state;
+    new_state.loadFromJson(obj);
+    d->main_player.setState(new_state);
+    d->got_collision_ack = true;
 }
 
 void World::playerUpdate(int player_index, QString player_state)
 {
+    qDebug() << QCoreApplication::applicationPid() << ": received a player update";
     if(player_index == d->connected_player.size())
     {
         std::random_device seeder{};
@@ -234,6 +231,11 @@ void World::Private::fixCollisions(Player &player)
     {
         collided = true;
         auto col = static_cast<Player*>(colliding_items[0]);
+        int col_index = -1;
+        for(col_index=0; col_index<connected_player.size(); col++)
+            if(col == connected_player[col_index].get())
+                break;
+
         State p_state = player.getState();
         if(p_state.x_speed > 0)
         {
@@ -285,6 +287,10 @@ void World::Private::fixCollisions(Player &player)
             }
         }
         col->setSpeed(0,0);
+        bas_controller.sendCollisionUpdate(col_index, col->getState().toJsonString());
+        got_collision_ack = false;
+        while(!got_collision_ack)
+            ;
         colliding_items = player.collidingItems();
     }
     if(collided)

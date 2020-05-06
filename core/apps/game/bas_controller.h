@@ -37,15 +37,18 @@ public:
 
     void establishConnections(QString mp_state);
     void sendPlayerUpdate(QString mp_state);
+    void sendCollisionUpdate(int player_index, QString player_state);
 
 signals:
     void updatePlayer(int player_index, QString player_state);
+    void updateMainPlayer(QString mp_state);
+    void finishInitialization(void);
 
-private slots:
+public slots:
 
     // main notification handler
-    void handshakeTimeout(void);
     void slotReceiveMessage(Header, Message) override;
+    void handshakeTimeout(void);
 
 private:
 

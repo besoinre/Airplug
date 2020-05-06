@@ -12,9 +12,6 @@
 //Qt includes
 #include <QApplication>
 
-//std includes
-//#include <memory>
-
 //local includes
 #include "world.h"
 

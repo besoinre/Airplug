@@ -26,9 +26,11 @@ class World : public QObject
 {
     Q_OBJECT
 
-private slots:
+public slots:
     void frameTimeout(void);
     void playerUpdate(int player_index, QString player_state);
+    void mainPlayerUpdate(QString mp_state);
+    void finishInitialization(void);
 
 public:
     World(QCoreApplication &app);
