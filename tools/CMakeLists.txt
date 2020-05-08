@@ -21,5 +21,6 @@ MACRO(LIBAPG_TOOLS_BUILD)
                          )
 ENDMACRO()
 
-LIBAPG_TOOLS_BUILD(test_message.cpp)
-LIBAPG_TOOLS_BUILD(test_clock.cpp)
+LIBAPG_TOOLS_BUILD(test_time_stamp.cpp)
+#LIBAPG_TOOLS_BUILD(test_message.cpp)
+#LIBAPG_TOOLS_BUILD(test_clock.cpp)

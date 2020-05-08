@@ -42,7 +42,7 @@ public:
     QGraphicsScene scene;
     QGraphicsView view;
 
-    Player main_player;
+    Player local_player;
     std::vector<std::shared_ptr<Player>> connected_player;
 
     QTimer frame_timer;
@@ -57,10 +57,15 @@ public:
 
 World::World(QCoreApplication &app) : d(std::make_unique<Private>(app))
 {
-    connect(&d->bas_controller, SIGNAL(updatePlayer(int, QString)), this, SLOT(playerUpdate(int, QString)));
-    connect(&d->bas_controller, SIGNAL(updateMainPlayer(QString)), this, SLOT(mainPlayerUpdate(QString)));
-    //initializing main_player
-    d->main_player.setRect(0,0,PLAYER_SIZE,PLAYER_SIZE);
+    connect(&d->bas_controller, SIGNAL(enterCriticalSection()), this, SLOT(criticalSection()));
+    connect(&d->bas_controller, SIGNAL(getLocalPlayerForAck()), this, SLOT(sendLocalPlayerForAck()));
+    connect(this, SIGNAL(signalSendLocalPlayerForAck(QString)), &d->bas_controller, SLOT(sendLocalPlayerAck(QString)));
+
+    // connect(&d->bas_controller, SIGNAL(updatePlayer(int, QString)), this, SLOT(playerUpdate(int, QString)));
+    // connect(&d->bas_controller, SIGNAL(updateMainPlayer(QString)), this, SLOT(mainPlayerUpdate(QString)));
+
+    //initializing local_player
+    d->local_player.setRect(0,0,PLAYER_SIZE,PLAYER_SIZE);
 
     QLinearGradient linear_grad(QPointF(0, 0), QPointF(PLAYER_SIZE, PLAYER_SIZE));
     linear_grad.setColorAt(0, Qt::red);
@@ -68,12 +73,12 @@ World::World(QCoreApplication &app) : d(std::make_unique<Private>(app))
     linear_grad.setColorAt(0.5, Qt::green);
     linear_grad.setColorAt(0.65, Qt::cyan);
     linear_grad.setColorAt(1, Qt::blue);
-    d->main_player.setBrush(QBrush(linear_grad));
+    d->local_player.setBrush(QBrush(linear_grad));
 
-    d->main_player.setFlag(QGraphicsItem::ItemIsFocusable);
-    d->main_player.setFocus();
+    d->local_player.setFlag(QGraphicsItem::ItemIsFocusable);
+    d->local_player.setFocus();
 
-    d->scene.addItem(&d->main_player);
+    d->scene.addItem(&d->local_player);
 
     d->scene.setSceneRect(0, 0, VIEW_WIDTH*2, VIEW_HEIGHT*2);
 
@@ -82,12 +87,12 @@ World::World(QCoreApplication &app) : d(std::make_unique<Private>(app))
     std::uniform_int_distribution<> x_dis(0, VIEW_WIDTH-1-PLAYER_SIZE);
     std::uniform_int_distribution<> y_dis(0, VIEW_HEIGHT-1-PLAYER_SIZE);
 
-    d->main_player.setPos(x_dis(twister), y_dis(twister));
+    d->local_player.setPos(x_dis(twister), y_dis(twister));
 
     std::vector<QColor> color = {Qt::white,Qt::black,Qt::cyan,Qt::red,Qt::magenta,Qt::green,Qt::yellow,Qt::blue,Qt::gray};
     std::uniform_int_distribution<> color_dis(0, color.size()-1);
 
-    d->bas_controller.establishConnections(d->main_player.getState().toJsonString());
+    d->bas_controller.establishConnections(d->local_player.getState().toJsonString());
     connect(&d->bas_controller, SIGNAL(finishInitialization()), this, SLOT(finishInitialization()));
 }
 
@@ -111,7 +116,7 @@ void World::frameTimeout(void)
 {
     for(auto it = d->connected_player.begin(); it != d->connected_player.end(); ++it)
     {
-        if((*it)->getFrame() < d->main_player.getFrame())
+        if((*it)->getFrame() < d->local_player.getFrame())
         {
             QTimer::singleShot(1, this, SLOT(frameTimeout()));
             return;
@@ -123,13 +128,18 @@ void World::frameTimeout(void)
 
         //critical session
         {
-            d->main_player.incrementFrame();
+            d->local_player.incrementFrame();
             d->frame++;
-            d->moveAndUpdatePlayer(d->main_player);
-            d->fixCollisions(d->main_player);
+            d->moveAndUpdatePlayer(d->local_player);
+            d->fixCollisions(d->local_player);
         }
-        d->bas_controller.sendPlayerUpdate(d->main_player.getState().toJsonString());
+        d->bas_controller.sendPlayerUpdate(d->local_player.getState().toJsonString());
     }
+}
+
+void World::sendLocalPlayerForAck(QString local_player)
+{
+    emit signalSendLocalPlayerForAck(local_player.toJsonString());
 }
 
 void World::mainPlayerUpdate(QString mp_state)
@@ -137,7 +147,7 @@ void World::mainPlayerUpdate(QString mp_state)
     QJsonObject obj = QJsonDocument::fromJson(mp_state.toUtf8()).object();
     State new_state;
     new_state.loadFromJson(obj);
-    d->main_player.setState(new_state);
+    d->local_player.setState(new_state);
     d->got_collision_ack = true;
 }
 
@@ -295,6 +305,11 @@ void World::Private::fixCollisions(Player &player)
     }
     if(collided)
         player.setSpeed(0,0);
+}
+
+void World::criticalSection(void)
+{
+
 }
 
 }

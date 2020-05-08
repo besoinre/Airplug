@@ -1,5 +1,5 @@
-add_subdirectory(BAS)
-add_subdirectory(NET)
+#add_subdirectory(BAS)
+#add_subdirectory(NET)
 add_subdirectory(game)
 
 # copy network construction script to binary directory

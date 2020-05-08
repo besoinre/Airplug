@@ -12,9 +12,12 @@
 #ifndef ACLMESSAGE_H
 #define ACLMESSAGE_H
 
+//std includes
+#include <memory>
+
 // libapg include
 #include "message.h"
-#include "vector_clock.h"
+#include "time_stamp.h"
 
 namespace AirPlug
 {
@@ -51,9 +54,11 @@ public:
         PREPOST_MESSAGE,
         SNAPSHOT_RECOVER,
         READY_SNAPSHOT,
-        REQUEST_MUTEX,
-        ACCEPT_MUTEX,
-        REFUSE_MUTEX,
+        MUTEX_REQUEST,
+        MUTEX_ACKNOWLEDGE,
+        MUTEX_LIBERATION,
+        HANDSHAKE_SYN,
+        HANDSHAKE_ACK
     };
 
 public:
@@ -66,20 +71,18 @@ public:
 public:
 
     void setPerformative(Performative performative);
-    void setContent(const QJsonObject& content);
-    void setTimeStamp(const VectorClock& clock);
+    void setContent(QJsonObject& content);
+    void setTimeStamp(TimeStamp& time_stamp);
 
     // siteID of sender's NET
-    void setSender(const QString& siteID);
-    void setNbSequence(int nbSequence);
+    void setSender(int& siteID);
 
-    Performative getPerformative() const;
-    VectorClock* getTimeStamp()    const;
-    QJsonObject  getContent()      const;
-    QString      getSender()       const;
-    int          getNbSequence()   const;
+    Performative getPerformative();
+    std::shared_ptr<TimeStamp> getTimeStamp();
+    QJsonObject  getContent();
+    int getSender();
 
-    QJsonObject  toJsonObject()    const;
+    QJsonObject toJsonObject();
 };
 
 }

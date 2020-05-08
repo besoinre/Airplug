@@ -32,27 +32,23 @@ class BasController: public ApplicationController
     Q_OBJECT
 public:
 
-    // BasController(QCoreApplication &app, QObject* parent = nullptr);
-    // ~BasController();
-    //
-    // void establishConnections(QString mp_state);
-    // void sendPlayerUpdate(QString mp_state);
-    // void sendCollisionUpdate(int player_index, QString player_state);
+    BasController(QCoreApplication &app, QObject* parent = nullptr);
+    ~BasController();
+
+    void establishConnections(QString mp_state);
+    void sendPlayerUpdate(QString mp_state);
+    void sendCollisionUpdate(int player_index, QString player_state);
 
 signals:
-    // void updatePlayer(int player_index, QString player_state);
-    // void updateMainPlayer(QString mp_state);
-    // void finishInitialization(void);
-    void enterCriticalSection(void);
-    void getLocalPlayerForAck(void);
+    void updatePlayer(int player_index, QString player_state);
+    void updateMainPlayer(QString mp_state);
+    void finishInitialization(void);
 
 public slots:
 
+    // main notification handler
     void slotReceiveMessage(Header, Message) override;
-    // void handshakeTimeout(void);
-    void fowardMutexMessage(const ACLMessage& message);
-    void notifyAccessAllowed(void);
-    void sendLocalPlayerAck(QString local_player);
+    void handshakeTimeout(void);
 
 private:
 

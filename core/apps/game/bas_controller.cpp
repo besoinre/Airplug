@@ -9,6 +9,7 @@
 
 //local includes
 #include "constants.h"
+#include "mutex.h"
 
 using namespace AirPlug;
 
@@ -31,10 +32,12 @@ public:
 
 public:
 
+    Mutex mutex;
+
     QTimer handshake_timer;
     bool handshake_timeout = false;
     bool accepting_new_connections = true;
-    QMap<int,QPair<int,QString>> connection_state;
+    QMap<int, ACLMessage::Performative> connection_state;
     int established_connections = 0;
 };
 
@@ -45,6 +48,10 @@ BasController::BasController(QCoreApplication &app, QObject* parent)
       d(std::make_unique<Private>())
 {
     ApplicationController::init(app);
+
+    //connect mutex signals
+    connect(&d->mutex, SIGNAL(signalResponse()), this, SLOT(fowardMutexMessage()));
+    connect(&d->mutex, SIGNAL(accessAllowed()), this, SLOT(notifyAccessAllowed()));
 }
 
 BasController::~BasController()
@@ -99,67 +106,46 @@ void BasController::sendCollisionUpdate(int player_index, QString player_state)
 
 void BasController::slotReceiveMessage(Header header, Message message)
 {
-    QHash<QString, QString> contents = message.getContents();
-    qDebug() << QCoreApplication::applicationPid() << ": message received";
-    if(contents.contains(QString("action")))
-    {
-        if(contents[QString("action")] == "SYN")
-        {
-            qDebug() << QCoreApplication::applicationPid() << ": it's a syn message";
-            if(d->accepting_new_connections)
-            {
-                if(contents.contains(QString("id")) && contents.contains(QString("state")))
-                {
-                    int id = contents[QString("id")].toInt();
-                    if(!d->connection_state.contains(id))
-                    {
-                        d->connection_state[id] = QPair<int, QString>(d->established_connections, contents[QString("action")]);
-                        d->established_connections++;
-                        emit updatePlayer(d->connection_state[id].first, contents[QString("state")]);
+    ACLMessage* aclMessage = (static_cast<ACLMessage*>(&message));
 
-                        Message ack_message;
-                        ack_message.addContent(QString("action"), QString("ACK"));
-                        ack_message.addContent(QString("id"), QString::number(QCoreApplication::applicationPid()));
-                        qDebug() << QCoreApplication::applicationPid() << ": sending ack message";
-                        sendMessage(ack_message, QString(), QString(), QString());
-                    }
-                }
-            }
-        }
-        else if(contents[QString("action")] == "ACK")
-        {
-            qDebug() << QCoreApplication::applicationPid() << ": it's an ack message";
-            if(d->accepting_new_connections)
-            {
-                if(contents.contains(QString("id")))
-                {
-                    int id = contents[QString("id")].toInt();
-                    if(d->connection_state.contains(id))
-                        d->connection_state[id].second = "ACK";
-                }
-            }
-        }
-        else if(contents[QString("action")] == "PLU")
-        {
-            qDebug() << QCoreApplication::applicationPid() << ": it's a plu message";
-            if(contents.contains(QString("id")) && contents.contains(QString("state")))
-            {
-                int id = contents[QString("id")].toInt();
-                if(d->connection_state.contains(id))
-                {
-                    emit updatePlayer(d->connection_state[id].first, contents[QString("state")]);
-                }
-            }
-        }
-        else if(contents[QString("action")] == "MPU")
-        {
-            qDebug() << QCoreApplication::applicationPid() << ": it's a mpu message";
-            if(contents.contains(QString("state")))
-            {
-                emit updateMainPlayer(contents[QString("state")]);
-            }
-        }
+    switch (aclMessage->getPerformative())
+    {
+        case ACLMessage::MUTEX_REQUEST:
+            d->mutex.requestUpdate(ACLMessage.getTimeStamp());
+            break;
+        case ACLMessage::MUTEX_ACKNOWLEDGE:
+            d->mutex.acknowlegdeUpdate(ACLMessage.getTimeStamp());
+            break;
+        case ACLMessage::MUTEX_LIBERATION:
+            d->mutex.liberationUpdate(ACLMessage.getTimeStamp());
+            break;
+
+        case ACLMessage::HANDSHAKE_SYN:
+            //TODO - verifier si c'est le premier syn recu du site
+            emit getLocalPlayerAck();
+            break;
+        case ACLMessage::HANDSHAKE_ACK:
+        default:
+            break;
     }
+}
+
+void BasController::fowardMutexMessage(const ACLMessage& message)
+{
+    sendMessage(message, QString(), QString(), QString());
+}
+
+void BasController::notifyAccessAllowed(void)
+{
+    emit enterCriticalZone();
+}
+
+void sendLocalPlayerAck(QString local_player)
+{
+    ACLMessage ack_message(ACLMessage::HANDSHAKE_ACK);
+    ack_message.setSender(QCoreApplication::applicationPid());
+    ack_message.addContent("local_player", local_player);
+    sendMessage(message, QString(), QString(), QString());
 }
 
 }

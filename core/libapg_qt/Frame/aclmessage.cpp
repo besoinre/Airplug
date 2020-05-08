@@ -23,61 +23,51 @@ void ACLMessage::setPerformative(Performative performative)
     addContent(QLatin1String("perfomative"), QString::number(performative));
 }
 
-void ACLMessage::setContent(const QJsonObject& content)
+void ACLMessage::setContent(QJsonObject& content)
 {
     addContent(QLatin1String("content"), QJsonDocument(content).toJson(QJsonDocument::Compact));
 }
 
-void ACLMessage::setTimeStamp(const VectorClock& clock)
+void ACLMessage::setTimeStamp(TimeStamp& time_stamp)
 {
-    addContent(QLatin1String("timestamp"), QJsonDocument(clock.convertToJson()).toJson(QJsonDocument::Compact));
+    addContent(QLatin1String("time_stamp"), QJsonDocument(time_stamp.convertToJson()).toJson(QJsonDocument::Compact));
 }
 
-void ACLMessage::setSender(const QString& siteID)
+void ACLMessage::setSender(int& siteID)
 {
-    addContent(QLatin1String("sender"), siteID);
+    addContent(QLatin1String("sender"), QString::number(siteID));
 }
 
-void ACLMessage::setNbSequence(int nbSequence)
-{
-    addContent(QLatin1String("nbSequence"), QString::number(nbSequence));
-}
-
-ACLMessage::Performative ACLMessage::getPerformative() const
+ACLMessage::Performative ACLMessage::getPerformative()
 {
     return static_cast<Performative>(getContents()[QLatin1String("perfomative")].toInt());
 }
 
-VectorClock* ACLMessage::getTimeStamp() const
+std::shared_ptr<TimeStamp> ACLMessage::getTimeStamp()
 {
     QHash<QString, QString> contents = getContents();
 
-    if (contents.contains(QLatin1String("timestamp")))
+    if (contents.contains(QLatin1String("time_stamp")))
     {
-        QJsonObject jsonClock =  QJsonDocument::fromJson(contents[QLatin1String("timestamp")].toUtf8()).object();
+        QJsonObject jsonTimeStamp =  QJsonDocument::fromJson(contents[QLatin1String("time_stamp")].toUtf8()).object();
 
-        return new VectorClock(jsonClock);
+        return std::make_shared<TimeStamp>(jsonTimeStamp);
     }
 
     return nullptr;
 }
 
-QJsonObject ACLMessage::getContent() const
+QJsonObject ACLMessage::getContent()
 {
     return QJsonDocument::fromJson(getContents()[QLatin1String("content")].toUtf8()).object();
 }
 
-QString ACLMessage::getSender() const
+int ACLMessage::getSender()
 {
-    return getContents()[QLatin1String("sender")];
+    return getContents()[QLatin1String("sender")].toInt();
 }
 
-int ACLMessage::getNbSequence() const
-{
-    return getContents()[QLatin1String("nbSequence")].toInt();
-}
-
-QJsonObject ACLMessage::toJsonObject() const
+QJsonObject ACLMessage::toJsonObject()
 {
     QHash<QString, QString> contents = getContents();
 
@@ -85,11 +75,10 @@ QJsonObject ACLMessage::toJsonObject() const
 
     json[QLatin1String("perfomative")] = contents[QLatin1String("perfomative")];
     json[QLatin1String("sender")]      = contents[QLatin1String("sender")];
-    json[QLatin1String("nbSequence")]  = contents[QLatin1String("nbSequence")].toInt();
 
-    if (contents.contains(QLatin1String("timestamp")))
+    if (contents.contains(QLatin1String("time_stamp")))
     {
-        json[QLatin1String("timestamp")] = QJsonDocument::fromJson(contents[QLatin1String("timestamp")].toUtf8()).object();
+        json[QLatin1String("time_stamp")] = QJsonDocument::fromJson(contents[QLatin1String("time_stamp")].toUtf8()).object();
     }
 
     json[QLatin1String("content")]     = QJsonDocument::fromJson(getContents()[QLatin1String("content")].toUtf8()).object();

@@ -31,6 +31,12 @@ public slots:
     void playerUpdate(int player_index, QString player_state);
     void mainPlayerUpdate(QString mp_state);
     void finishInitialization(void);
+    void criticalSection(void);
+
+    void sendLocalPlayerForAck(void);
+
+signals:
+    void signalSendLocalPlayerForAck(QString local_player);
 
 public:
     World(QCoreApplication &app);

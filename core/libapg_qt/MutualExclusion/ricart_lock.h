@@ -9,7 +9,7 @@
  *
  * ============================================================ */
 
-#ifndef RICART_LOCK_H
+#ifndef MUTEX_H
 #define RICART_LOCK_H
 
 // Qt include

@@ -15,8 +15,8 @@ int main(int argc, char *argv[])
 {
     ACLMessage message(ACLMessage::INFORM);
 
-     VectorClock clock1(QLatin1String("Site1"));
-     ++clock1;
+    VectorClock clock1(QLatin1String("Site1"));
+    ++clock1;
 
     message.setTimeStamp(clock1);
 
