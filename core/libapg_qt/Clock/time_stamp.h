@@ -18,8 +18,9 @@ class TimeStamp
 {
 public:
 
+    TimeStamp();
     TimeStamp(const int& siteID);
-    TimeStamp(const int& siteID, const int& clock);
+    TimeStamp(const int& siteID, const int& time);
     TimeStamp(const QJsonObject& json);
     TimeStamp(const TimeStamp& other);
 
@@ -29,7 +30,7 @@ public:
 
     TimeStamp operator= (const TimeStamp& other);
     TimeStamp operator++ (int);
-    void updateTimeStamp(const TimeStamp& other);
+    TimeStamp updateTimeStamp(const TimeStamp& other);
     bool operator< (const TimeStamp& other);
 
 public:

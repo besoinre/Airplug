@@ -27,12 +27,12 @@ class World : public QObject
     Q_OBJECT
 
 public slots:
-    void frameTimeout(void);
-    void playerUpdate(int player_index, QString player_state);
-    void mainPlayerUpdate(QString mp_state);
     void finishInitialization(void);
+
+    void frameTimeout(void);
     void criticalSection(void);
 
+    void playerUpdateFromMessage(int site_id, QString player_state);
     void sendLocalPlayerForAck(void);
 
 signals:

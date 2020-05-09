@@ -11,6 +11,7 @@
 
 //Qt includes
 #include <QApplication>
+#include <QDebug>
 
 //local includes
 #include "world.h"

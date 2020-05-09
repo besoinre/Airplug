@@ -73,6 +73,7 @@ VectorClock VectorClock::operator= (const VectorClock& other)
     d->localClock = other.d->localClock;
 
     d->localClock.detach();
+    return *this;
 }
 
 VectorClock VectorClock::operator++ ()

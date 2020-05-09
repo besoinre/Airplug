@@ -35,10 +35,8 @@ public:
     Mutex mutex;
 
     QTimer handshake_timer;
-    bool handshake_timeout = false;
     bool accepting_new_connections = true;
     QMap<int, ACLMessage::Performative> connection_state;
-    int established_connections = 0;
 };
 
 
@@ -50,7 +48,7 @@ BasController::BasController(QCoreApplication &app, QObject* parent)
     ApplicationController::init(app);
 
     //connect mutex signals
-    connect(&d->mutex, SIGNAL(signalResponse()), this, SLOT(fowardMutexMessage()));
+    connect(&d->mutex, SIGNAL(signalResponse(const ACLMessage&)), this, SLOT(fowardMutexMessage(const ACLMessage&)));
     connect(&d->mutex, SIGNAL(accessAllowed()), this, SLOT(notifyAccessAllowed()));
 }
 
@@ -59,12 +57,11 @@ BasController::~BasController()
 
 }
 
-void BasController::establishConnections(QString mp_state)
+void BasController::establishConnections(QString local_player_state)
 {
-    Message message;
-    message.addContent(QString("action"), QString("SYN"));
-    message.addContent(QString("id"), QString::number(QCoreApplication::applicationPid()));
-    message.addContent(QString("state"), mp_state);
+    ACLMessage message(ACLMessage::HANDSHAKE_SYN);
+    message.setSender(QCoreApplication::applicationPid());
+    message.addContent(QString("state"), local_player_state);
     sendMessage(message, QString(), QString(), QString());
 
     connect(&d->handshake_timer, SIGNAL(timeout()), this, SLOT(handshakeTimeout()));
@@ -75,9 +72,9 @@ void BasController::handshakeTimeout(void)
 {
     for(auto key : d->connection_state.keys())
     {
-        if(d->connection_state[key].second != QString("ACK"))
+        if(d->connection_state[key] != ACLMessage::HANDSHAKE_ACK)
         {
-            qDebug() << QCoreApplication::applicationPid() << ": shit negro, we couldn't connect";
+            qDebug() << "pid:" <<QCoreApplication::applicationPid() << ": oops we couldn't connect";
             exit(1);
         }
     }
@@ -86,45 +83,73 @@ void BasController::handshakeTimeout(void)
     emit finishInitialization();
 }
 
-void BasController::sendPlayerUpdate(QString mp_state)
+void BasController::lock(void)
 {
-    Message message;
-    message.addContent(QString("action"), QString("PLU"));
-    message.addContent(QString("id"), QString::number(QCoreApplication::applicationPid()));
-    message.addContent(QString("state"), mp_state);
-    sendMessage(message, QString(), QString(), QString());
+    d->mutex.lock();
 }
 
-void BasController::sendCollisionUpdate(int player_index, QString player_state)
+void BasController::unlock(void)
 {
-    Message message;
-    message.addContent(QString("action"), QString("MPU"));
-    message.addContent(QString("id"), QString::number(QCoreApplication::applicationPid()));
-    message.addContent(QString("state"), player_state);
+    d->mutex.unlock();
+}
+
+void BasController::sendLocalPlayerAck(QString local_player)
+{
+    ACLMessage ack_message(ACLMessage::HANDSHAKE_ACK);
+    ack_message.setSender(QCoreApplication::applicationPid());
+    ack_message.addContent("state", local_player);
+    sendMessage(ack_message, QString(), QString(), QString());
+}
+
+void BasController::sendPlayerUpdate(int site_id, QString player_state)
+{
+    ACLMessage message(ACLMessage::UPDATE);
+    message.addContent("site_id", QString::number(site_id));
+    message.addContent("state", player_state);
     sendMessage(message, QString(), QString(), QString());
 }
 
 void BasController::slotReceiveMessage(Header header, Message message)
 {
-    ACLMessage* aclMessage = (static_cast<ACLMessage*>(&message));
+    qDebug() << message.getContents();
+    ACLMessage acl_message = *(static_cast<ACLMessage*>(&message));
 
-    switch (aclMessage->getPerformative())
+    switch (acl_message.getPerformative())
     {
         case ACLMessage::MUTEX_REQUEST:
-            d->mutex.requestUpdate(ACLMessage.getTimeStamp());
+            d->mutex.requestUpdate(acl_message.getTimeStamp());
             break;
         case ACLMessage::MUTEX_ACKNOWLEDGE:
-            d->mutex.acknowlegdeUpdate(ACLMessage.getTimeStamp());
+            d->mutex.acknowledgeUpdate(acl_message.getTimeStamp());
             break;
         case ACLMessage::MUTEX_LIBERATION:
-            d->mutex.liberationUpdate(ACLMessage.getTimeStamp());
+            d->mutex.liberationUpdate(acl_message.getTimeStamp());
             break;
 
         case ACLMessage::HANDSHAKE_SYN:
-            //TODO - verifier si c'est le premier syn recu du site
-            emit getLocalPlayerAck();
+            if(d->accepting_new_connections)
+            {
+                if(!d->connection_state.contains(acl_message.getSender()))
+                {
+                    d->connection_state[acl_message.getSender()] = ACLMessage::HANDSHAKE_SYN;
+                    d->mutex.addPlayerConnection(acl_message.getSender());
+                    emit getLocalPlayerForAck();
+                }
+            }
             break;
         case ACLMessage::HANDSHAKE_ACK:
+            if(d->accepting_new_connections)
+            {
+                int id = acl_message.getSender();
+                d->connection_state[id] = ACLMessage::HANDSHAKE_ACK;
+                emit playerUpdateReceived(id, acl_message.getContents()["state"]);
+            }
+            break;
+
+        case ACLMessage::UPDATE:
+            emit playerUpdateReceived(acl_message.getContents()["site_id"].toInt(), acl_message.getContents()["state"]);
+            break;
+
         default:
             break;
     }
@@ -137,15 +162,7 @@ void BasController::fowardMutexMessage(const ACLMessage& message)
 
 void BasController::notifyAccessAllowed(void)
 {
-    emit enterCriticalZone();
-}
-
-void sendLocalPlayerAck(QString local_player)
-{
-    ACLMessage ack_message(ACLMessage::HANDSHAKE_ACK);
-    ack_message.setSender(QCoreApplication::applicationPid());
-    ack_message.addContent("local_player", local_player);
-    sendMessage(message, QString(), QString(), QString());
+    emit enterCriticalSection();
 }
 
 }

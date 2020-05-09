@@ -43,10 +43,11 @@ public:
     QGraphicsView view;
 
     Player local_player;
-    std::vector<std::shared_ptr<Player>> connected_player;
+    QMap<int, std::shared_ptr<Player>> connected_player;
 
     QTimer frame_timer;
     int frame = 0;
+    bool lock_demanded = false;
 
     void moveAndUpdatePlayer(Player &player);
     void fixCollisions(Player &player);
@@ -57,12 +58,12 @@ public:
 
 World::World(QCoreApplication &app) : d(std::make_unique<Private>(app))
 {
-    connect(&d->bas_controller, SIGNAL(enterCriticalSection()), this, SLOT(criticalSection()));
     connect(&d->bas_controller, SIGNAL(getLocalPlayerForAck()), this, SLOT(sendLocalPlayerForAck()));
     connect(this, SIGNAL(signalSendLocalPlayerForAck(QString)), &d->bas_controller, SLOT(sendLocalPlayerAck(QString)));
+    connect(&d->bas_controller, SIGNAL(finishInitialization()), this, SLOT(finishInitialization()));
 
-    // connect(&d->bas_controller, SIGNAL(updatePlayer(int, QString)), this, SLOT(playerUpdate(int, QString)));
-    // connect(&d->bas_controller, SIGNAL(updateMainPlayer(QString)), this, SLOT(mainPlayerUpdate(QString)));
+    connect(&d->bas_controller, SIGNAL(enterCriticalSection()), this, SLOT(criticalSection()));
+    connect(&d->bas_controller, SIGNAL(playerUpdateReceived(int, QString)), this, SLOT(playerUpdateFromMessage(int, QString)));
 
     //initializing local_player
     d->local_player.setRect(0,0,PLAYER_SIZE,PLAYER_SIZE);
@@ -89,11 +90,7 @@ World::World(QCoreApplication &app) : d(std::make_unique<Private>(app))
 
     d->local_player.setPos(x_dis(twister), y_dis(twister));
 
-    std::vector<QColor> color = {Qt::white,Qt::black,Qt::cyan,Qt::red,Qt::magenta,Qt::green,Qt::yellow,Qt::blue,Qt::gray};
-    std::uniform_int_distribution<> color_dis(0, color.size()-1);
-
     d->bas_controller.establishConnections(d->local_player.getState().toJsonString());
-    connect(&d->bas_controller, SIGNAL(finishInitialization()), this, SLOT(finishInitialization()));
 }
 
 void World::finishInitialization(void)
@@ -114,63 +111,59 @@ World::~World()
 
 void World::frameTimeout(void)
 {
-    for(auto it = d->connected_player.begin(); it != d->connected_player.end(); ++it)
+    if(!d->lock_demanded)
     {
-        if((*it)->getFrame() < d->local_player.getFrame())
+        d->bas_controller.lock();
+        d->lock_demanded = true;
+    }
+}
+
+void World::criticalSection(void)
+{
+    d->local_player.incrementFrame();
+    d->frame++;
+    d->moveAndUpdatePlayer(d->local_player);
+    d->fixCollisions(d->local_player);
+    d->bas_controller.sendPlayerUpdate(QCoreApplication::applicationPid(), d->local_player.getState().toJsonString());
+
+    d->lock_demanded = false;
+    d->bas_controller.unlock();
+}
+
+void World::sendLocalPlayerForAck(void)
+{
+    emit signalSendLocalPlayerForAck(d->local_player.getState().toJsonString());
+}
+
+void World::playerUpdateFromMessage(int site_id, QString player_state)
+{
+    if(site_id == QCoreApplication::applicationPid())
+    {
+        QJsonObject obj = QJsonDocument::fromJson(player_state.toUtf8()).object();
+        State new_state;
+        new_state.loadFromJson(obj);
+        d->local_player.setState(new_state);
+    }
+    else
+    {
+        if(!d->connected_player.contains(site_id))
         {
-            QTimer::singleShot(1, this, SLOT(frameTimeout()));
-            return;
+            std::random_device seeder{};
+            std::mt19937 twister{seeder()};
+            std::vector<QColor> color = {Qt::white,Qt::black,Qt::cyan,Qt::red,Qt::magenta,Qt::green,Qt::yellow,Qt::blue,Qt::gray};
+            std::uniform_int_distribution<> color_dis(0, color.size()-1);
+
+            d->connected_player[site_id] = std::make_shared<Player>();
+            d->connected_player[site_id]->setRect(0,0,PLAYER_SIZE,PLAYER_SIZE);
+            d->connected_player[site_id]->setBrush(QBrush(color[color_dis(twister)]));
+            d->scene.addItem(d->connected_player[site_id].get());
         }
+
+        QJsonObject obj = QJsonDocument::fromJson(player_state.toUtf8()).object();
+        State new_state;
+        new_state.loadFromJson(obj);
+        d->connected_player[site_id]->setState(new_state);
     }
-
-    {
-        //mutex
-
-        //critical session
-        {
-            d->local_player.incrementFrame();
-            d->frame++;
-            d->moveAndUpdatePlayer(d->local_player);
-            d->fixCollisions(d->local_player);
-        }
-        d->bas_controller.sendPlayerUpdate(d->local_player.getState().toJsonString());
-    }
-}
-
-void World::sendLocalPlayerForAck(QString local_player)
-{
-    emit signalSendLocalPlayerForAck(local_player.toJsonString());
-}
-
-void World::mainPlayerUpdate(QString mp_state)
-{
-    QJsonObject obj = QJsonDocument::fromJson(mp_state.toUtf8()).object();
-    State new_state;
-    new_state.loadFromJson(obj);
-    d->local_player.setState(new_state);
-    d->got_collision_ack = true;
-}
-
-void World::playerUpdate(int player_index, QString player_state)
-{
-    qDebug() << QCoreApplication::applicationPid() << ": received a player update";
-    if(player_index == d->connected_player.size())
-    {
-        std::random_device seeder{};
-        std::mt19937 twister{seeder()};
-        std::vector<QColor> color = {Qt::white,Qt::black,Qt::cyan,Qt::red,Qt::magenta,Qt::green,Qt::yellow,Qt::blue,Qt::gray};
-        std::uniform_int_distribution<> color_dis(0, color.size()-1);
-
-        d->connected_player.push_back(std::make_shared<Player>());
-        d->connected_player[player_index]->setRect(0,0,PLAYER_SIZE,PLAYER_SIZE);
-        d->connected_player[player_index]->setBrush(QBrush(color[color_dis(twister)]));
-        d->scene.addItem(d->connected_player[player_index].get());
-    }
-
-    QJsonObject obj = QJsonDocument::fromJson(player_state.toUtf8()).object();
-    State new_state;
-    new_state.loadFromJson(obj);
-    d->connected_player[player_index]->setState(new_state);
 }
 
 void World::Private::moveAndUpdatePlayer(Player &player)
@@ -241,10 +234,10 @@ void World::Private::fixCollisions(Player &player)
     {
         collided = true;
         auto col = static_cast<Player*>(colliding_items[0]);
-        int col_index = -1;
-        for(col_index=0; col_index<connected_player.size(); col++)
-            if(col == connected_player[col_index].get())
-                break;
+        int collided_player_id = -1;
+        for(auto key : connected_player.keys())
+            if(col == connected_player[key].get())
+                collided_player_id = key;
 
         State p_state = player.getState();
         if(p_state.x_speed > 0)
@@ -297,7 +290,7 @@ void World::Private::fixCollisions(Player &player)
             }
         }
         col->setSpeed(0,0);
-        bas_controller.sendCollisionUpdate(col_index, col->getState().toJsonString());
+        bas_controller.sendPlayerUpdate(collided_player_id, col->getState().toJsonString());
         got_collision_ack = false;
         while(!got_collision_ack)
             ;
@@ -305,11 +298,6 @@ void World::Private::fixCollisions(Player &player)
     }
     if(collided)
         player.setSpeed(0,0);
-}
-
-void World::criticalSection(void)
-{
-
 }
 
 }

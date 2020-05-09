@@ -23,6 +23,12 @@ public:
     int site_id;
 };
 
+TimeStamp::TimeStamp()
+    : d(std::make_unique<Private>())
+{
+    d->time = 0;
+}
+
 TimeStamp::TimeStamp(const int& site_id)
     : d(std::make_unique<Private>())
 {
@@ -70,10 +76,11 @@ TimeStamp TimeStamp::operator++ (int)
     return TimeStamp(*this);
 }
 
-void TimeStamp::updateTimeStamp(const TimeStamp& other)
+TimeStamp TimeStamp::updateTimeStamp(const TimeStamp& other)
 {
     if(d->time < other.d->time)
         d->time = other.d->time;
+    return *this;
 }
 
 bool TimeStamp::operator< (const TimeStamp& other)

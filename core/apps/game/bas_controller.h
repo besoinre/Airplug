@@ -21,6 +21,7 @@
 
 //local include
 #include "application_controller.h"
+#include "aclmessage.h"
 
 using namespace AirPlug;
 
@@ -32,26 +33,29 @@ class BasController: public ApplicationController
     Q_OBJECT
 public:
 
-    // BasController(QCoreApplication &app, QObject* parent = nullptr);
-    // ~BasController();
-    //
-    // void establishConnections(QString mp_state);
-    // void sendPlayerUpdate(QString mp_state);
-    // void sendCollisionUpdate(int player_index, QString player_state);
+    BasController(QCoreApplication &app, QObject* parent = nullptr);
+    ~BasController();
+
+    void establishConnections(QString local_player_state);
+    void lock(void);
+    void unlock(void);
+    void sendPlayerUpdate(int site_id, QString player_state);
 
 signals:
-    // void updatePlayer(int player_index, QString player_state);
-    // void updateMainPlayer(QString mp_state);
-    // void finishInitialization(void);
+
+    void finishInitialization(void);
     void enterCriticalSection(void);
     void getLocalPlayerForAck(void);
+    void playerUpdateReceived(int site_id, QString player_state);
 
 public slots:
 
     void slotReceiveMessage(Header, Message) override;
-    // void handshakeTimeout(void);
+
     void fowardMutexMessage(const ACLMessage& message);
     void notifyAccessAllowed(void);
+
+    void handshakeTimeout(void);
     void sendLocalPlayerAck(QString local_player);
 
 private:

@@ -22,6 +22,7 @@ set(libapg_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/Frame/header.cpp
 
                 #${CMAKE_CURRENT_SOURCE_DIR}/Snapshot/laiyang_snapshot.cpp
 
+                ${CMAKE_CURRENT_SOURCE_DIR}/MutualExclusion/mutex.cpp
                 #${CMAKE_CURRENT_SOURCE_DIR}/MutualExclusion/ricart_lock.cpp
     )
 

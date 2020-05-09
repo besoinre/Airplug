@@ -1,7 +1,13 @@
 #include "mutex.h"
 
+//std includes
+#include <utility>
+
+//qt includes
 #include <QDebug>
 #include <QMap>
+#include <QPair>
+#include <QCoreApplication>
 
 namespace AirPlug
 {
@@ -11,7 +17,6 @@ class Q_DECL_HIDDEN Mutex::Private
 public:
 
     Private()
-        : clock(nullptr)
     {
 
     }
@@ -23,11 +28,7 @@ public:
 
 public:
 
-    bool isLessPriority(const VectorClock& requesterClock) const;
-
-public:
-
-    QMap<int, std::pair<ACLMessage::Perfomative, TimeStamp> tab;
+    QMap<int, QPair<ACLMessage::Performative, TimeStamp>> tab;
     int local_site_id;
 };
 
@@ -35,7 +36,9 @@ Mutex::Mutex()
     : QObject(nullptr),
       d(std::make_unique<Private>())
 {
-
+    d->local_site_id = QCoreApplication::applicationPid();
+    QPair<ACLMessage::Performative, TimeStamp> p(ACLMessage::MUTEX_LIBERATION, TimeStamp(d->local_site_id));
+    d->tab[d->local_site_id] = p;
 }
 
 Mutex::~Mutex()
@@ -43,39 +46,64 @@ Mutex::~Mutex()
 
 }
 
+void Mutex::addPlayerConnection(int site_id)
+{
+    QPair<ACLMessage::Performative, TimeStamp> p(ACLMessage::MUTEX_LIBERATION, TimeStamp(site_id));
+    d->tab[site_id] = p;
+}
+
+void Mutex::lock(void)
+{
+    d->tab[d->local_site_id].first = ACLMessage::MUTEX_REQUEST;
+    d->tab[d->local_site_id].second++;
+
+    ACLMessage req_message(ACLMessage::MUTEX_REQUEST);
+    req_message.setTimeStamp(d->tab[d->local_site_id].second);
+    emit signalResponse(req_message);
+}
+
+void Mutex::unlock(void)
+{
+    d->tab[d->local_site_id].first = ACLMessage::MUTEX_LIBERATION;
+    d->tab[d->local_site_id].second++;
+
+    ACLMessage lib_message(ACLMessage::MUTEX_LIBERATION);
+    lib_message.setTimeStamp(d->tab[d->local_site_id].second);
+    emit signalResponse(lib_message);
+}
+
 void Mutex::requestUpdate(TimeStamp message_time_stamp)
 {
-    tab[message_time_stamp.getSiteID()].first = ACLMessage::MUTEX_REQUEST;
-    tab[message_time_stamp.getSiteID()].second = (tab[local_site_id].second.updateTimeStamp(message_time_stamp))++;
+    d->tab[message_time_stamp.getSiteID()].first = ACLMessage::MUTEX_REQUEST;
+    d->tab[message_time_stamp.getSiteID()].second = (d->tab[d->local_site_id].second.updateTimeStamp(message_time_stamp))++;
 
     ACLMessage ack_message(ACLMessage::MUTEX_ACKNOWLEDGE);
-    ack_message.setTimeStamp(tab[local_site_id].second);
-
+    ack_message.setTimeStamp(d->tab[d->local_site_id].second);
     emit signalResponse(ack_message);
 
-    if(tab[local_site_id].first == ACLMessage::MUTEX_REQUEST)
+
+    if(d->tab[d->local_site_id].first == ACLMessage::MUTEX_REQUEST)
     {
-        for(auto key : tab.keys())
+        for(auto key : d->tab.keys())
         {
-            if(!(tab[local_site_id].second < tab[key].second]))
+            if(key != d->local_site_id && !(d->tab[d->local_site_id].second < d->tab[key].second))
                 return;
         }
     }
 
-    //message entrer en section critique a faire
     emit accessAllowed();
 }
 
 void Mutex::liberationUpdate(TimeStamp message_time_stamp)
 {
-    tab[message_time_stamp.getSiteID()].first = ACLMessage::MUTEX_LIBERATION;
-    tab[message_time_stamp.getSiteID()].second = (tab[local_site_id].second.updateTimeStamp(message_time_stamp))++;
+    d->tab[message_time_stamp.getSiteID()].first = ACLMessage::MUTEX_LIBERATION;
+    d->tab[message_time_stamp.getSiteID()].second = (d->tab[d->local_site_id].second.updateTimeStamp(message_time_stamp))++;
 
-    if(tab[local_site_id].first == ACLMessage::MUTEX_REQUEST)
+    if(d->tab[d->local_site_id].first == ACLMessage::MUTEX_REQUEST)
     {
-        for(auto key : tab.keys())
+        for(auto key : d->tab.keys())
         {
-            if(!(tab[local_site_id].second < tab[key].second]))
+            if(key != d->local_site_id && !(d->tab[d->local_site_id].second < d->tab[key].second))
                 return;
         }
     }
@@ -85,19 +113,19 @@ void Mutex::liberationUpdate(TimeStamp message_time_stamp)
 
 void Mutex::acknowledgeUpdate(TimeStamp message_time_stamp)
 {
-    tab[local_site_id].second.updateTimeStamp(message_time_stamp)++;
+    d->tab[d->local_site_id].second.updateTimeStamp(message_time_stamp)++;
 
-    if(!(tab[message_time_stamp.getSiteID()].first == ACLMessage::MUTEX_REQUEST))
+    if(!(d->tab[message_time_stamp.getSiteID()].first == ACLMessage::MUTEX_REQUEST))
     {
-        tab[message_time_stamp.getSiteID()].first = ACLMessage::MUTEX_ACKNOWLEDGE;
-        tab[message_time_stamp.getSiteID()].second = message_time_stamp.getTimeStamp()++;
+        d->tab[message_time_stamp.getSiteID()].first = ACLMessage::MUTEX_ACKNOWLEDGE;
+        d->tab[message_time_stamp.getSiteID()].second = message_time_stamp++;
     }
 
-    if(tab[local_site_id].first == ACLMessage::MUTEX_REQUEST)
+    if(d->tab[d->local_site_id].first == ACLMessage::MUTEX_REQUEST)
     {
-          for(auto key : tab.keys())
+          for(auto key : d->tab.keys())
           {
-              if(!(tab[local_site_id].second < tab[key].second]))
+              if(key != d->local_site_id && !(d->tab[d->local_site_id].second < d->tab[key].second))
                   return;
           }
     }

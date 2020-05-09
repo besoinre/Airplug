@@ -33,7 +33,7 @@ void ACLMessage::setTimeStamp(TimeStamp& time_stamp)
     addContent(QLatin1String("time_stamp"), QJsonDocument(time_stamp.convertToJson()).toJson(QJsonDocument::Compact));
 }
 
-void ACLMessage::setSender(int& siteID)
+void ACLMessage::setSender(int siteID)
 {
     addContent(QLatin1String("sender"), QString::number(siteID));
 }
@@ -43,7 +43,7 @@ ACLMessage::Performative ACLMessage::getPerformative()
     return static_cast<Performative>(getContents()[QLatin1String("perfomative")].toInt());
 }
 
-std::shared_ptr<TimeStamp> ACLMessage::getTimeStamp()
+TimeStamp ACLMessage::getTimeStamp()
 {
     QHash<QString, QString> contents = getContents();
 
@@ -51,10 +51,11 @@ std::shared_ptr<TimeStamp> ACLMessage::getTimeStamp()
     {
         QJsonObject jsonTimeStamp =  QJsonDocument::fromJson(contents[QLatin1String("time_stamp")].toUtf8()).object();
 
-        return std::make_shared<TimeStamp>(jsonTimeStamp);
+        return TimeStamp(jsonTimeStamp);
     }
 
-    return nullptr;
+    TimeStamp trash;
+    return trash;
 }
 
 QJsonObject ACLMessage::getContent()

@@ -58,7 +58,8 @@ public:
         MUTEX_ACKNOWLEDGE,
         MUTEX_LIBERATION,
         HANDSHAKE_SYN,
-        HANDSHAKE_ACK
+        HANDSHAKE_ACK,
+        UPDATE
     };
 
 public:
@@ -75,10 +76,10 @@ public:
     void setTimeStamp(TimeStamp& time_stamp);
 
     // siteID of sender's NET
-    void setSender(int& siteID);
+    void setSender(int siteID);
 
     Performative getPerformative();
-    std::shared_ptr<TimeStamp> getTimeStamp();
+    TimeStamp getTimeStamp();
     QJsonObject  getContent();
     int getSender();
 

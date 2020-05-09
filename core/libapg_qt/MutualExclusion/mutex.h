@@ -24,26 +24,19 @@ public:
 
 public:
 
-    void trylock(const TimeStamp& requester_stamp);
+    void addPlayerConnection(int site_id);
 
-    void lock();
-
-    void unlock();
-
-    void restart();
-
-    void receiveExternalRequest(const TimeStamp& requester_stamp);
-
-    QJsonArray getPendingQueue() const;
+    void lock(void);
+    void unlock(void);
 
     void requestUpdate(TimeStamp message_time_stamp);
-    void acknowlegdeUpdatet(TimeStamp message_time_stamp);
+    void acknowledgeUpdate(TimeStamp message_time_stamp);
     void liberationUpdate(TimeStamp message_time_stamp);
 
-public:
+signals:
 
-    Q_SIGNAL void signalResponse(const ACLMessage& message);
-    Q_SIGNAL void accessAllowed(void);
+    void signalResponse(const ACLMessage& message);
+    void accessAllowed(void);
 
 private:
 
