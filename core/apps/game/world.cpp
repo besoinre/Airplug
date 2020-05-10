@@ -47,6 +47,7 @@ public:
 
     QTimer frame_timer;
     int frame = 0;
+    int timeouts = 0;
     bool lock_demanded = false;
 
     void moveAndUpdatePlayer(Player &player);
@@ -63,6 +64,7 @@ World::World(QCoreApplication &app) : d(std::make_unique<Private>(app))
     connect(&d->bas_controller, SIGNAL(finishInitialization()), this, SLOT(finishInitialization()));
 
     connect(&d->bas_controller, SIGNAL(enterCriticalSection()), this, SLOT(criticalSection()));
+    connect(&d->bas_controller, SIGNAL(enterCriticalSectionEnd()), this, SLOT(criticalSectionEnd()));
     connect(&d->bas_controller, SIGNAL(playerUpdateReceived(int, QString)), this, SLOT(playerUpdateFromMessage(int, QString)));
 
     //initializing local_player
@@ -111,11 +113,9 @@ World::~World()
 
 void World::frameTimeout(void)
 {
-    if(!d->lock_demanded)
-    {
-        d->bas_controller.lock();
-        d->lock_demanded = true;
-    }
+    d->frame_timer.stop();
+    d->bas_controller.lock();
+    d->local_player.setFocus();
 }
 
 void World::criticalSection(void)
@@ -125,9 +125,13 @@ void World::criticalSection(void)
     d->moveAndUpdatePlayer(d->local_player);
     d->fixCollisions(d->local_player);
     d->bas_controller.sendPlayerUpdate(QCoreApplication::applicationPid(), d->local_player.getState().toJsonString());
+    QTimer::singleShot(UPDATE_ACK_TIMEOUT, this, SLOT(criticalSectionEnd()))    ;
+}
 
-    d->lock_demanded = false;
+void World::criticalSectionEnd(void)
+{
     d->bas_controller.unlock();
+    d->frame_timer.start(FRAME_PERIOD_MS);
 }
 
 void World::sendLocalPlayerForAck(void)
@@ -291,13 +295,12 @@ void World::Private::fixCollisions(Player &player)
         }
         col->setSpeed(0,0);
         bas_controller.sendPlayerUpdate(collided_player_id, col->getState().toJsonString());
-        got_collision_ack = false;
-        while(!got_collision_ack)
-            ;
         colliding_items = player.collidingItems();
     }
     if(collided)
+    {
         player.setSpeed(0,0);
+    }
 }
 
 }

@@ -179,6 +179,11 @@ void Message::addContent(const QString& key, const QString& value)
      d->content[key] = value;
 }
 
+void Message::removeContent(const QString& key)
+{
+     d->content.remove(key);
+}
+
 QHash<QString, QString> Message::getContents() const
 {
     return d->content;

@@ -59,7 +59,8 @@ public:
         MUTEX_LIBERATION,
         HANDSHAKE_SYN,
         HANDSHAKE_ACK,
-        UPDATE
+        UPDATE,
+        UPDATE_ACK
     };
 
 public:

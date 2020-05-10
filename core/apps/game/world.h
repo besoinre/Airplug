@@ -31,6 +31,7 @@ public slots:
 
     void frameTimeout(void);
     void criticalSection(void);
+    void criticalSectionEnd(void);
 
     void playerUpdateFromMessage(int site_id, QString player_state);
     void sendLocalPlayerForAck(void);

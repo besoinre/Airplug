@@ -58,6 +58,7 @@ public:
     bool isKnownField(const QString& pair) const;
 
     void addContent(const QString& key, const QString& value);
+    void removeContent(const QString& key);
 
     /**
      * @brief getContents: return QHash of message content

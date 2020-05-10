@@ -45,6 +45,7 @@ signals:
 
     void finishInitialization(void);
     void enterCriticalSection(void);
+    void enterCriticalSectionEnd(void);
     void getLocalPlayerForAck(void);
     void playerUpdateReceived(int site_id, QString player_state);
 
@@ -52,7 +53,7 @@ public slots:
 
     void slotReceiveMessage(Header, Message) override;
 
-    void fowardMutexMessage(const ACLMessage& message);
+    void fowardMutexMessage(ACLMessage message);
     void notifyAccessAllowed(void);
 
     void handshakeTimeout(void);

@@ -35,7 +35,7 @@ public:
 
 signals:
 
-    void signalResponse(const ACLMessage& message);
+    void signalResponse(ACLMessage message);
     void accessAllowed(void);
 
 private:

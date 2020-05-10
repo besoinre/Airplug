@@ -42,13 +42,13 @@ public:
 
 
 BasController::BasController(QCoreApplication &app, QObject* parent)
-    : ApplicationController(QString("game"), parent),
+    : ApplicationController(QString(), parent),
       d(std::make_unique<Private>())
 {
     ApplicationController::init(app);
 
     //connect mutex signals
-    connect(&d->mutex, SIGNAL(signalResponse(const ACLMessage&)), this, SLOT(fowardMutexMessage(const ACLMessage&)));
+    connect(&d->mutex, SIGNAL(signalResponse(ACLMessage)), this, SLOT(fowardMutexMessage(ACLMessage)));
     connect(&d->mutex, SIGNAL(accessAllowed()), this, SLOT(notifyAccessAllowed()));
 }
 
@@ -62,6 +62,7 @@ void BasController::establishConnections(QString local_player_state)
     ACLMessage message(ACLMessage::HANDSHAKE_SYN);
     message.setSender(QCoreApplication::applicationPid());
     message.addContent(QString("state"), local_player_state);
+    message.addContent(QString("header_who"), QString("game"));
     sendMessage(message, QString(), QString(), QString());
 
     connect(&d->handshake_timer, SIGNAL(timeout()), this, SLOT(handshakeTimeout()));
@@ -70,11 +71,17 @@ void BasController::establishConnections(QString local_player_state)
 
 void BasController::handshakeTimeout(void)
 {
+    if(d->connection_state.empty())
+    {
+        qDebug() << "pid:" << QCoreApplication::applicationPid() << ": oops we couldn't connect";
+        exit(1);
+    }
+
     for(auto key : d->connection_state.keys())
     {
         if(d->connection_state[key] != ACLMessage::HANDSHAKE_ACK)
         {
-            qDebug() << "pid:" <<QCoreApplication::applicationPid() << ": oops we couldn't connect";
+            qDebug() << "pid:" << QCoreApplication::applicationPid() << ": oops we couldn't connect";
             exit(1);
         }
     }
@@ -98,65 +105,91 @@ void BasController::sendLocalPlayerAck(QString local_player)
     ACLMessage ack_message(ACLMessage::HANDSHAKE_ACK);
     ack_message.setSender(QCoreApplication::applicationPid());
     ack_message.addContent("state", local_player);
+    ack_message.addContent(QString("header_who"), QString("game"));
     sendMessage(ack_message, QString(), QString(), QString());
 }
 
 void BasController::sendPlayerUpdate(int site_id, QString player_state)
 {
     ACLMessage message(ACLMessage::UPDATE);
+    message.setSender(QCoreApplication::applicationPid());
     message.addContent("site_id", QString::number(site_id));
     message.addContent("state", player_state);
+    message.addContent(QString("header_who"), QString("game"));
     sendMessage(message, QString(), QString(), QString());
 }
 
 void BasController::slotReceiveMessage(Header header, Message message)
 {
-    qDebug() << message.getContents();
-    ACLMessage acl_message = *(static_cast<ACLMessage*>(&message));
-
-    switch (acl_message.getPerformative())
+    if(message.getContents()["header_who"] == "game")
     {
-        case ACLMessage::MUTEX_REQUEST:
-            d->mutex.requestUpdate(acl_message.getTimeStamp());
-            break;
-        case ACLMessage::MUTEX_ACKNOWLEDGE:
-            d->mutex.acknowledgeUpdate(acl_message.getTimeStamp());
-            break;
-        case ACLMessage::MUTEX_LIBERATION:
-            d->mutex.liberationUpdate(acl_message.getTimeStamp());
-            break;
-
-        case ACLMessage::HANDSHAKE_SYN:
-            if(d->accepting_new_connections)
+        ACLMessage acl_message = *(static_cast<ACLMessage*>(&message));
+        switch (acl_message.getPerformative())
+        {
+            case ACLMessage::MUTEX_REQUEST:
             {
-                if(!d->connection_state.contains(acl_message.getSender()))
+                d->mutex.requestUpdate(acl_message.getTimeStamp());
+                break;
+            }
+            case ACLMessage::MUTEX_ACKNOWLEDGE:
+            {
+                d->mutex.acknowledgeUpdate(acl_message.getTimeStamp());
+                break;
+            }
+            case ACLMessage::MUTEX_LIBERATION:
+            {
+                d->mutex.liberationUpdate(acl_message.getTimeStamp());
+                break;
+            }
+
+            case ACLMessage::HANDSHAKE_SYN:
+            {
+                if(d->accepting_new_connections)
                 {
-                    d->connection_state[acl_message.getSender()] = ACLMessage::HANDSHAKE_SYN;
-                    d->mutex.addPlayerConnection(acl_message.getSender());
-                    emit getLocalPlayerForAck();
+                    if(!d->connection_state.contains(acl_message.getSender()))
+                    {
+                        d->connection_state[acl_message.getSender()] = ACLMessage::HANDSHAKE_SYN;
+                        d->mutex.addPlayerConnection(acl_message.getSender());
+                        emit getLocalPlayerForAck();
+                    }
                 }
+                break;
             }
-            break;
-        case ACLMessage::HANDSHAKE_ACK:
-            if(d->accepting_new_connections)
+
+            case ACLMessage::HANDSHAKE_ACK:
             {
-                int id = acl_message.getSender();
-                d->connection_state[id] = ACLMessage::HANDSHAKE_ACK;
-                emit playerUpdateReceived(id, acl_message.getContents()["state"]);
+                if(d->accepting_new_connections)
+                {
+                    int id = acl_message.getSender();
+                    d->connection_state[id] = ACLMessage::HANDSHAKE_ACK;
+                    emit playerUpdateReceived(id, acl_message.getContents()["state"]);
+                }
+                break;
             }
-            break;
 
-        case ACLMessage::UPDATE:
-            emit playerUpdateReceived(acl_message.getContents()["site_id"].toInt(), acl_message.getContents()["state"]);
-            break;
-
-        default:
-            break;
+            case ACLMessage::UPDATE:
+            {
+                ACLMessage ack_message(ACLMessage::UPDATE_ACK);
+                ack_message.addContent("acked_id", QString::number(acl_message.getSender()));
+                message.addContent(QString("header_who"), QString("game"));
+                sendMessage(ack_message, QString(), QString(), QString());
+                emit playerUpdateReceived(acl_message.getContents()["site_id"].toInt(), acl_message.getContents()["state"]);
+                break;
+            }
+            case ACLMessage::UPDATE_ACK:
+            {
+                emit enterCriticalSectionEnd();
+                break;
+            }
+            default:
+                break;
+        }
     }
 }
 
-void BasController::fowardMutexMessage(const ACLMessage& message)
+void BasController::fowardMutexMessage(ACLMessage message)
 {
+    message.addContent(QString("header_who"), QString("game"));
     sendMessage(message, QString(), QString(), QString());
 }
 
