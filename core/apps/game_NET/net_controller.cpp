@@ -112,7 +112,7 @@ void NetController::slotReceiveMessage(Header header, Message message)
                     {
                         //foward to other NETs
                         message.addContent(QString("header_who"), QString("game_NET"));
-                        sendMessage(message, QString(), QString("game"), QString());
+                        sendMessage(message, QString(), QString(), QString());
                         //foward to game
                         message.removeContent(QString("header_who"));
                         message.addContent(QString("header_who"), QString("game"));
