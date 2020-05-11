@@ -4,6 +4,7 @@
 set(game_SRCS
     main.cpp
     net_controller.cpp
+    mainwindow.cpp
 )
 
 add_executable(game_NET ${game_SRCS})

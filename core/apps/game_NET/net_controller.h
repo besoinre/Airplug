@@ -26,12 +26,12 @@ public:
 
     void init(const QCoreApplication &app) override;
 
-    void takeSnapshot() const;
+    void takeSnapshot(void);
 
-private:
+private slots:
 
     // main notification handler
-    Q_SLOT void slotReceiveMessage(Header, Message) override;
+    void slotReceiveMessage(Header, Message) override;
 
 private:
 

@@ -36,8 +36,11 @@ public slots:
     void playerUpdateFromMessage(int site_id, QString player_state);
     void sendLocalPlayerForAck(void);
 
+    void getState(void);
+
 signals:
     void signalSendLocalPlayerForAck(QString local_player);
+    void returnWorldState(QJsonObject world_state);
 
 public:
     World(QCoreApplication &app);

@@ -4,12 +4,15 @@
 #include <QCoreApplication>
 #include <QTimer>
 #include <QMap>
+#include <QHash>
 #include <QPair>
 #include <QDebug>
+#include <QFile>
 
 //local includes
 #include "constants.h"
 #include "mutex.h"
+#include "vector_clock.h"
 
 using namespace AirPlug;
 
@@ -37,6 +40,8 @@ public:
     QTimer handshake_timer;
     bool accepting_new_connections = true;
     QMap<int, ACLMessage::Performative> connection_state;
+
+    std::shared_ptr<VectorClock> vector_clock;
 };
 
 
@@ -85,6 +90,15 @@ void BasController::handshakeTimeout(void)
             exit(1);
         }
     }
+
+    QHash<QString, int> clock;
+    for(auto key : d->connection_state.keys())
+    {
+        clock[QString::number(key)] = 0;
+    }
+    clock[QString::number(QCoreApplication::applicationPid())] = 0;
+    d->vector_clock = std::make_shared<VectorClock>(QString::number(QCoreApplication::applicationPid()), clock);
+
     d->handshake_timer.stop();
     d->accepting_new_connections = false;
     emit finishInitialization();
@@ -116,6 +130,8 @@ void BasController::sendPlayerUpdate(int site_id, QString player_state)
     message.addContent("site_id", QString::number(site_id));
     message.addContent("state", player_state);
     message.addContent(QString("header_who"), QString("game"));
+    (*d->vector_clock)++;
+    message.setVectorClock(*d->vector_clock);
     sendMessage(message, QString(), QString(), QString());
 }
 
@@ -129,16 +145,22 @@ void BasController::slotReceiveMessage(Header header, Message message)
             case ACLMessage::MUTEX_REQUEST:
             {
                 d->mutex.requestUpdate(acl_message.getTimeStamp());
+                d->vector_clock->updateClock(acl_message.getVectorClock());
+                (*d->vector_clock)++;
                 break;
             }
             case ACLMessage::MUTEX_ACKNOWLEDGE:
             {
                 d->mutex.acknowledgeUpdate(acl_message.getTimeStamp());
+                d->vector_clock->updateClock(acl_message.getVectorClock());
+                (*d->vector_clock)++;
                 break;
             }
             case ACLMessage::MUTEX_LIBERATION:
             {
                 d->mutex.liberationUpdate(acl_message.getTimeStamp());
+                d->vector_clock->updateClock(acl_message.getVectorClock());
+                (*d->vector_clock)++;
                 break;
             }
 
@@ -169,16 +191,30 @@ void BasController::slotReceiveMessage(Header header, Message message)
 
             case ACLMessage::UPDATE:
             {
+                d->vector_clock->updateClock(acl_message.getVectorClock());
+                (*d->vector_clock)++;
                 ACLMessage ack_message(ACLMessage::UPDATE_ACK);
                 ack_message.addContent("acked_id", QString::number(acl_message.getSender()));
-                message.addContent(QString("header_who"), QString("game"));
+                ack_message.addContent(QString("header_who"), QString("game"));
+                (*d->vector_clock)++;
+                ack_message.setVectorClock(*d->vector_clock);
                 sendMessage(ack_message, QString(), QString(), QString());
                 emit playerUpdateReceived(acl_message.getContents()["site_id"].toInt(), acl_message.getContents()["state"]);
                 break;
             }
             case ACLMessage::UPDATE_ACK:
             {
+                d->vector_clock->updateClock(acl_message.getVectorClock());
+                (*d->vector_clock)++;
                 emit enterCriticalSectionEnd();
+                break;
+            }
+
+            case ACLMessage::SNAPSHOT_REQUEST:
+            {
+                d->vector_clock->updateClock(acl_message.getVectorClock());
+                (*d->vector_clock)++;
+                emit getWorldState();
                 break;
             }
             default:
@@ -190,12 +226,22 @@ void BasController::slotReceiveMessage(Header header, Message message)
 void BasController::fowardMutexMessage(ACLMessage message)
 {
     message.addContent(QString("header_who"), QString("game"));
+    (*d->vector_clock)++;
+    message.setVectorClock(*d->vector_clock);
     sendMessage(message, QString(), QString(), QString());
 }
 
 void BasController::notifyAccessAllowed(void)
 {
     emit enterCriticalSection();
+}
+
+void BasController::receivedWorldState(QJsonObject world_state)
+{
+    world_state["vector_clock"] = d->vector_clock->convertToJson();
+    QFile json_file(QString::number(QCoreApplication::applicationPid()));
+    json_file.open(QFile::WriteOnly);
+    json_file.write(QJsonDocument(world_state).toJson());
 }
 
 }

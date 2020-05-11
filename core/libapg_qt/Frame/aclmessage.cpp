@@ -33,6 +33,11 @@ void ACLMessage::setTimeStamp(TimeStamp& time_stamp)
     addContent(QLatin1String("time_stamp"), QJsonDocument(time_stamp.convertToJson()).toJson(QJsonDocument::Compact));
 }
 
+void ACLMessage::setVectorClock(VectorClock& vectorClock)
+{
+    addContent(QLatin1String("vector_clock"), QJsonDocument(vectorClock.convertToJson()).toJson(QJsonDocument::Compact));
+}
+
 void ACLMessage::setSender(int siteID)
 {
     addContent(QLatin1String("sender"), QString::number(siteID));
@@ -55,6 +60,21 @@ TimeStamp ACLMessage::getTimeStamp()
     }
 
     TimeStamp trash;
+    return trash;
+}
+
+VectorClock ACLMessage::getVectorClock()
+{
+    QHash<QString, QString> contents = getContents();
+
+    if (contents.contains(QLatin1String("vector_clock")))
+    {
+        QJsonObject jsonVectorClock =  QJsonDocument::fromJson(contents[QLatin1String("vector_clock")].toUtf8()).object();
+
+        return VectorClock(jsonVectorClock);
+    }
+
+    VectorClock trash("trash");
     return trash;
 }
 

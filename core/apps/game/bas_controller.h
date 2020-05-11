@@ -49,6 +49,9 @@ signals:
     void getLocalPlayerForAck(void);
     void playerUpdateReceived(int site_id, QString player_state);
 
+    void getWorldState(void);
+
+
 public slots:
 
     void slotReceiveMessage(Header, Message) override;
@@ -58,6 +61,8 @@ public slots:
 
     void handshakeTimeout(void);
     void sendLocalPlayerAck(QString local_player);
+
+    void receivedWorldState(QJsonObject world_state);
 
 private:
 

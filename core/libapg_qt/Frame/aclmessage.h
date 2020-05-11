@@ -18,6 +18,7 @@
 // libapg include
 #include "message.h"
 #include "time_stamp.h"
+#include "vector_clock.h"
 
 namespace AirPlug
 {
@@ -49,7 +50,7 @@ public:
         PONG,
 
         // custom Distributed perfomative
-        REQUEST_SNAPSHOT,
+        SNAPSHOT_REQUEST,
         INFORM_STATE,
         PREPOST_MESSAGE,
         SNAPSHOT_RECOVER,
@@ -60,7 +61,8 @@ public:
         HANDSHAKE_SYN,
         HANDSHAKE_ACK,
         UPDATE,
-        UPDATE_ACK
+        UPDATE_ACK,
+
     };
 
 public:
@@ -75,12 +77,14 @@ public:
     void setPerformative(Performative performative);
     void setContent(QJsonObject& content);
     void setTimeStamp(TimeStamp& time_stamp);
+    void setVectorClock(VectorClock& vectorClock);
 
     // siteID of sender's NET
     void setSender(int siteID);
 
     Performative getPerformative();
     TimeStamp getTimeStamp();
+    VectorClock getVectorClock();
     QJsonObject  getContent();
     int getSender();
 

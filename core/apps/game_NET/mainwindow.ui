@@ -17,8 +17,8 @@
    <widget class="QPushButton" name="snapshotButton">
     <property name="geometry">
      <rect>
-      <x>190</x>
-      <y>110</y>
+      <x>130</x>
+      <y>120</y>
       <width>181</width>
       <height>25</height>
      </rect>

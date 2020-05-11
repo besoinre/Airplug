@@ -67,6 +67,9 @@ World::World(QCoreApplication &app) : d(std::make_unique<Private>(app))
     connect(&d->bas_controller, SIGNAL(enterCriticalSectionEnd()), this, SLOT(criticalSectionEnd()));
     connect(&d->bas_controller, SIGNAL(playerUpdateReceived(int, QString)), this, SLOT(playerUpdateFromMessage(int, QString)));
 
+    connect(&d->bas_controller, SIGNAL(getWorldState()), this, SLOT(getState()));
+    connect(this, SIGNAL(returnWorldState(QJsonObject)), &d->bas_controller, SLOT(receivedWorldState(QJsonObject)));
+
     //initializing local_player
     d->local_player.setRect(0,0,PLAYER_SIZE,PLAYER_SIZE);
 
@@ -109,6 +112,18 @@ void World::finishInitialization(void)
 World::~World()
 {
 
+}
+
+void World::getState(void)
+{
+    QJsonObject world;
+    world["local_player"] = QJsonDocument::fromJson(d->local_player.getState().toJsonString().toUtf8()).object();
+    for(auto key : d->connected_player.keys())
+    {
+        world[QString::number(key)] = QJsonDocument::fromJson(d->connected_player[key]->getState().toJsonString().toUtf8()).object();
+    }
+
+    emit returnWorldState(world);
 }
 
 void World::frameTimeout(void)

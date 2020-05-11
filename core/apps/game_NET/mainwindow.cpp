@@ -6,20 +6,15 @@
 
 using namespace Ui;
 
-namespace NetApplication
+namespace GameNetApplication
 {
 
-MainWindow::MainWindow(NetController* controller, QWidget *parent) :
+MainWindow::MainWindow(NetController& controller, QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     m_controller(controller)
 {
     ui->setupUi(this);
-
-    if (!m_controller)
-    {
-        qFatal("NET Controller is null");
-    }
 }
 
 MainWindow::~MainWindow()
@@ -29,10 +24,8 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_snapshotButton_clicked()
 {
-    m_controller->takeSnapshot();
+    m_controller.takeSnapshot();
 }
 
 
 }
-
-

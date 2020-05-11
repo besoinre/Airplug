@@ -6,6 +6,7 @@
 #include <QCoreApplication>
 
 // Local include
+#include "aclmessage.h"
 
 using namespace AirPlug;
 
@@ -30,6 +31,8 @@ public:
     QMap<int, std::shared_ptr<QMap<int, Message>>> future_message;
     int net_id;
     int sequence_number = 0;
+
+    bool snapshot_took = false;
 };
 
 
@@ -52,6 +55,21 @@ void NetController::init(const QCoreApplication &app)
     d->net_id = QCoreApplication::applicationPid();
 }
 
+void NetController::takeSnapshot(void)
+{
+    qDebug() << "snap!";
+    if(!d->snapshot_took)
+    {
+        ACLMessage message(ACLMessage::SNAPSHOT_REQUEST);
+        message.addContent(QString("header_who"), QString("game_NET"));
+        sendMessage(message, QString(), QString(), QString());
+        message.removeContent(QString("header_who"));
+        message.addContent(QString("header_who"), QString("game"));
+        sendMessage(message, QString(), QString(), QString());
+        d->snapshot_took = true;
+    }
+}
+
 void NetController::slotReceiveMessage(Header header, Message message)
 {
     auto contents = message.getContents();
@@ -65,6 +83,16 @@ void NetController::slotReceiveMessage(Header header, Message message)
     }
     else if(message.getContents()["header_who"] == "game_NET")
     {
+        ACLMessage acl_message = *(static_cast<ACLMessage*>(&message));
+        if(!d->snapshot_took && acl_message.getPerformative() == ACLMessage::SNAPSHOT_REQUEST)
+        {
+            sendMessage(message, QString(), QString(), QString());
+            message.removeContent(QString("header_who"));
+            message.addContent(QString("header_who"), QString("game"));
+            sendMessage(message, QString(), QString(), QString());
+            d->snapshot_took = true;
+            return;
+        }
         int sender_net_id = contents["net_id"].toInt();
         int sender_nseq = contents["sequence_number"].toInt();
         if(!(sender_net_id == d->net_id))
