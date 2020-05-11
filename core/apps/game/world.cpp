@@ -135,12 +135,15 @@ void World::frameTimeout(void)
 
 void World::criticalSection(void)
 {
+    for(auto key : d->connected_player.keys())
+        if(d->connected_player[key]->getState().frame < d->frame)
+            return;
     d->local_player.incrementFrame();
     d->frame++;
     d->moveAndUpdatePlayer(d->local_player);
     d->fixCollisions(d->local_player);
     d->bas_controller.sendPlayerUpdate(QCoreApplication::applicationPid(), d->local_player.getState().toJsonString());
-    QTimer::singleShot(UPDATE_ACK_TIMEOUT, this, SLOT(criticalSectionEnd()))    ;
+    QTimer::singleShot(UPDATE_ACK_TIMEOUT, this, SLOT(criticalSectionEnd()));
 }
 
 void World::criticalSectionEnd(void)
