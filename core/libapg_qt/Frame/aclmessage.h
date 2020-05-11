@@ -77,7 +77,7 @@ public:
     void setPerformative(Performative performative);
     void setContent(QJsonObject& content);
     void setTimeStamp(TimeStamp& time_stamp);
-    void setVectorClock(VectorClock& vectorClock);
+    void setVectorClock(VectorClock& vector_clock);
 
     // siteID of sender's NET
     void setSender(int siteID);

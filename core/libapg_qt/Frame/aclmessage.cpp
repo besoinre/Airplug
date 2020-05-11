@@ -33,7 +33,7 @@ void ACLMessage::setTimeStamp(TimeStamp& time_stamp)
     addContent(QLatin1String("time_stamp"), QJsonDocument(time_stamp.convertToJson()).toJson(QJsonDocument::Compact));
 }
 
-void ACLMessage::setVectorClock(VectorClock& vectorClock)
+void ACLMessage::setVectorClock(VectorClock& vector_clock)
 {
     addContent(QLatin1String("vector_clock"), QJsonDocument(vectorClock.convertToJson()).toJson(QJsonDocument::Compact));
 }
