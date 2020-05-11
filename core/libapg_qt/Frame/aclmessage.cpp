@@ -35,7 +35,7 @@ void ACLMessage::setTimeStamp(TimeStamp& time_stamp)
 
 void ACLMessage::setVectorClock(VectorClock& vector_clock)
 {
-    addContent(QLatin1String("vector_clock"), QJsonDocument(vectorClock.convertToJson()).toJson(QJsonDocument::Compact));
+    addContent(QLatin1String("vector_clock"), QJsonDocument(vector_clock.convertToJson()).toJson(QJsonDocument::Compact));
 }
 
 void ACLMessage::setSender(int siteID)
